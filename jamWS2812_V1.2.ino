@@ -272,7 +272,7 @@ bool stateAlarm = false;
 
     for(int i=0;i<2;i++){ strip.setPixelColor(dot1[i],strip.Color(0,0,0)); strip.setPixelColor(dot2[i],strip.Color(0,0,0)); strip.show();}
     Serial.println("RUN");
-    Time.setA1Time(5, 21, 30, 00, 0x0, true,false, false);
+    Time.setA1Time(5, 04, 45, 00, 0x0, true,false, false);
     
     // now it is safe to enable interrupt output
     Time.turnOnAlarm(1);
@@ -317,9 +317,7 @@ void loop() {
     
     monitorNtp(1);
     monitorTemp(2);
-   if(Time.checkIfAlarm(1)){
-    stateAlarm=true;
-   }
+   
    
    }
   else if(stateWifi == 0)
@@ -327,6 +325,9 @@ void loop() {
     monitorRtc(1);
     monitorTemp(2);
 
+   }
+    if(Time.checkIfAlarm(1)){
+    stateAlarm=true;
    }
     Serial.println(String()+"RunSel:"+RunSel);
     if(RunFinish==1) {RunSel = 2; RunFinish =0;}                      //after anim 1 set anim 2
@@ -339,7 +340,7 @@ void loop() {
 void alarmRun(int state){
   if(!state) return;
   static byte counter;
-  byte         limit = 20;
+  byte         limit = 60;
   static unsigned long save;
   unsigned long        tmr = millis();
  // buzzer(1);
