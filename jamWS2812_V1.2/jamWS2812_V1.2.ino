@@ -30,7 +30,7 @@
 #define LEDS_PER_DIGIT  LEDS_PER_SEG * 7
 #define LED   88
 #define indikator D0 //D4=lampu internal,D0=lampu eksternal
-#define BUZZ D7//D5
+#define BUZZ D4//D7
 #define button D3//
 #define led_state D2//4;//D2
 #define N_DIMMERS 1
@@ -63,6 +63,7 @@ int MR;
 bool wm_nonblocking = false;
 DateTime now;
 WiFiManager wifi;
+WiFiManagerParameter custom_field; // global param ( for non blocking w params )
 //unsigned long saveTimer = 0;
 int dot1[]={42,43};
 int dot2[]={44,45};
@@ -125,8 +126,11 @@ long numberss[] = {
 };
 
 bool stateAlarm = false;
+long dataTemp[100];
+
  void setup() 
  {
+   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP  
    // put your setup code here, to run once:
    Serial.begin(115200);
    digitalWrite(indikator, LOW);
@@ -139,8 +143,8 @@ bool stateAlarm = false;
    EEPROM.begin(12);
    Wire.begin();
    strip.begin();
-    dht.begin();
-   
+   dht.begin();
+   wifi.resetSettings(); 
    strip.setBrightness(50);
    stateWifi = EEPROM.read(0);
    stateMode = EEPROM.read(0);
@@ -149,6 +153,69 @@ bool stateAlarm = false;
    
    if(stateWifi==1)
    { 
+     if(wm_nonblocking) wifi.setConfigPortalBlocking(false);
+        ////////////////
+        // add a custom input field
+  int customFieldLength = 40;
+
+  // test custom html(radio)
+  const char* custom_radio_str = "<head><title>Alarm Clock</title><style>body{display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial,sans-serif;background-color:#f0f0f0;"}.container {
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .time-inputs {
+            margin-bottom: 20px;
+        }
+        .time-inputs input {
+            width: 60px;
+            padding: 5px;
+            font-size: 16px;
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+        }
+        .set-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .stop-btn {
+            background-color: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Alarm Clock</h1>
+        <div class="time-inputs">
+            <input type="number" id="hours" min="0" max="23" placeholder="HH">
+            <input type="number" id="minutes" min="0" max="59" placeholder="MM">
+            <input type="number" id="seconds" min="0" max="59" placeholder="SS">
+        </div>
+        <button class="set-btn">Set Alarm</button>
+        <button class="stop-btn">Stop Alarm</button>
+    </div>
+</body>
+";
+  new (&custom_field) WiFiManagerParameter(custom_radio_str); // custom html input
+  
+  wifi.addParameter(&custom_field);
+  wifi.setSaveParamsCallback(saveParamCallback);
+
+  std::vector<const char *> menu = {"wifi","info","param","sep","restart","exit"};
+  wifi.setMenu(menu);
+
+  // set dark theme
+  wifi.setClass("invert");
+        ///////////////////////////
    //WiFi.mode(WIFI_STA);
    showAP();
    wifi.setConfigPortalTimeout(60);
@@ -176,7 +243,9 @@ bool stateAlarm = false;
     {
       Serial.println("CONNECTED");
       showNTP();
-      if(wm_nonblocking) wifi.setConfigPortalBlocking(false);
+      
+      
+     
       for(int i =0; i < 2;i++)
       {
         digitalWrite(BUZZ,HIGH);
@@ -278,6 +347,19 @@ bool stateAlarm = false;
     Time.turnOnAlarm(1);
 }
 
+String getParam(String name){
+  //read parameter from server, for customhmtl input
+  String value;
+  if(wifi.server->hasArg(name)) {
+    value = wifi.server->arg(name);
+  }
+  return value;
+}
+
+void saveParamCallback(){
+  Serial.println("[CALLBACK] saveParamCallback fired");
+  Serial.println("PARAM customfieldid = " + getParam("customfieldid"));
+}
 
 void loop() {
   checkButton();
@@ -329,7 +411,7 @@ void loop() {
     if(Time.checkIfAlarm(1)){
     stateAlarm=true;
    }
-    Serial.println(String()+"RunSel:"+RunSel);
+    //Serial.println(String()+"RunSel:"+RunSel);
     if(RunFinish==1) {RunSel = 2; RunFinish =0;}                      //after anim 1 set anim 2
     if(RunFinish==2) {RunSel = 1; RunFinish =0;}
     
@@ -373,13 +455,13 @@ void monitorNtp(int drawAdd){
   getClockNTP();
   showClock(Wheel((hue + pixelColor) & 255));
   showDots(strip.Color(255, 0, 0));
-  Serial.println(String()+"test ntp");
+  //Serial.println(String()+"test ntp");
   strip.show();
   
   if((tmr - save) > 1000 and counter <= limit){
     save = tmr;
     counter++;
-    Serial.println(String()+"counterNTP:"+ counter);
+    //Serial.println(String()+"counterNTP:"+ counter);
   }
   if((tmr - save) > 2000 and (counter > limit)){
     counter = 0;
@@ -424,13 +506,13 @@ void monitorTemp(int drawAdd){
     for (int i = 42; i <= 45; i++) {
         strip.setPixelColor(i , strip.Color(0, 0, 0));
     }
-    Serial.println(String()+"test temperatur");
+    //Serial.println(String()+"test temperatur");
    
    
   if((tmr - save) > 1000 and counter <= limit){
     save = tmr;
     counter++;
-    Serial.println(String()+"counterTEMP:"+ counter);
+    //Serial.println(String()+"counterTEMP:"+ counter);
   }
   if((tmr - save) > 2000 and (counter > limit)){
     counter = 0;
@@ -734,6 +816,7 @@ void checkButton()
     delay(1000);
     
      strip.clear();
+     wifi.resetSettings(); 
     ESP.restart();
   }
  
