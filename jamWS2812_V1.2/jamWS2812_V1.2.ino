@@ -127,7 +127,8 @@ long numberss[] = {
 
 bool stateAlarm = false;
 long dataTemp[100];
-
+long data[100];
+long test[100];
  void setup() 
  {
    WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP  
@@ -140,11 +141,11 @@ long dataTemp[100];
    pinMode(button,INPUT);
    pinMode(led_state, OUTPUT);
    pinMode(dimmer_led, OUTPUT);
-   EEPROM.begin(12);
+   EEPROM.begin(512);
    Wire.begin();
    strip.begin();
    dht.begin();
-   wifi.resetSettings(); 
+   //wifi.resetSettings(); 
    strip.setBrightness(50);
    stateWifi = EEPROM.read(0);
    stateMode = EEPROM.read(0);
@@ -158,53 +159,7 @@ long dataTemp[100];
         // add a custom input field
   int customFieldLength = 40;
 
-  // test custom html(radio)
-  const char* custom_radio_str = "<head><title>Alarm Clock</title><style>body{display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial,sans-serif;background-color:#f0f0f0;"}.container {
-            text-align: center;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .time-inputs {
-            margin-bottom: 20px;
-        }
-        .time-inputs input {
-            width: 60px;
-            padding: 5px;
-            font-size: 16px;
-            text-align: center;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
-        }
-        .set-btn {
-            background-color: #4CAF50;
-            color: white;
-        }
-        .stop-btn {
-            background-color: #f44336;
-            color: white;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Alarm Clock</h1>
-        <div class="time-inputs">
-            <input type="number" id="hours" min="0" max="23" placeholder="HH">
-            <input type="number" id="minutes" min="0" max="59" placeholder="MM">
-            <input type="number" id="seconds" min="0" max="59" placeholder="SS">
-        </div>
-        <button class="set-btn">Set Alarm</button>
-        <button class="stop-btn">Stop Alarm</button>
-    </div>
-</body>
-";
+ const char* custom_radio_str = "<br/><label for='customfieldid'>Custom Field Label</label><input type='radio' name='customfieldid' value='1' checked> One<br><input type='radio' name='customfieldid' value='2'> Two<br><input type='radio' name='customfieldid' value='3'> Three";
   new (&custom_field) WiFiManagerParameter(custom_radio_str); // custom html input
   
   wifi.addParameter(&custom_field);
@@ -345,6 +300,21 @@ long dataTemp[100];
     
     // now it is safe to enable interrupt output
     Time.turnOnAlarm(1);
+    int maxVal;
+    int getCon = EEPROM.read(9);
+    Serial.println(String()+"getCon:"+getCon);
+    for(int i = 1; i <= getCon;i++){
+      test[i] = EEPROM.read((i+10));
+       Serial.println(String()+"hasil upload " + "counter:" + i +":" + test[i]);
+      
+    }
+    for (int i = 1; i <= getCon; i++) {
+    if (test[i] > maxVal) {
+      maxVal = test[i];  // Memperbarui nilai maxVal jika ditemukan nilai yang lebih besar
+    }
+   }
+   Serial.println(String()+ "suhuh terbesar:" + maxVal);
+   for (int i = 1; i < getCon; i++) { test[i]=0;}
 }
 
 String getParam(String name){
@@ -370,6 +340,7 @@ void loop() {
   //printDebug();
   timerHue();
   alarmRun(stateAlarm);
+  getDateTemp();
   
  if(stateWifi == 1)
   {
@@ -417,6 +388,55 @@ void loop() {
     
     digitalWrite(indikator, warningWIFI);
   
+}
+
+void getDateTemp(){
+  static int save;
+  static int maxVal;
+  static int counter;
+  byte limit = 50;
+  int temp = dht.readTemperature();
+  
+  if(save != temp){
+    save = temp;
+    counter++;
+    data[counter] = save;
+    Serial.println(String()+ "counter:"+ counter);
+    Serial.println(String()+ "save:"+save);
+    Serial.println(String()+ "temp:"+temp);
+
+      EEPROM.write((counter+10), data[counter]);
+      EEPROM.write(9,counter);
+      EEPROM.commit();
+       Serial.println(String()+"upload ke eeprom");
+  
+    for(int i = 1; i <= counter;i++){
+      test[i] = EEPROM.read((i+10));
+       Serial.println(String()+"hasil upload " + "counter:" + i +":" + test[i]);
+      Serial.println(String()+"counter:"+EEPROM.read(9));
+    }
+    
+    
+  }
+
+  
+
+  if(counter == limit){
+   for (int i = 1; i <= counter; i++) {
+    if (data[i] > maxVal) {
+      maxVal = data[i];  // Memperbarui nilai maxVal jika ditemukan nilai yang lebih besar
+    }
+   }
+  
+    for(int i=1;i<=limit;i++){
+    Serial.println(String()+ "hasil:" + data[i]);
+    Serial.println(String()+ "suhu terbesar:" + maxVal);
+    data[i]=0;
+    test[i]=0;
+    }
+    
+    counter=0;
+  }
 }
 
 void alarmRun(int state){
@@ -816,7 +836,7 @@ void checkButton()
     delay(1000);
     
      strip.clear();
-     wifi.resetSettings(); 
+     //wifi.resetSettings(); 
     ESP.restart();
   }
  
