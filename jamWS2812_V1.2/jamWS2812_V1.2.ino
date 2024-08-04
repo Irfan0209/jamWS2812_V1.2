@@ -8,7 +8,7 @@
   }
  */
 
-
+#include <FS.h>
 #include <Adafruit_NeoPixel.h>
 #include <NTPClient.h>
 #include <ESP8266WiFi.h>
@@ -21,6 +21,7 @@
 #include <ArduinoOTA.h>
 #include <ESP8266mDNS.h>
 #include "DHT.h"
+#include <ESP8266WebServer.h>
 
 #define DHTPIN D5
 
@@ -39,7 +40,8 @@
 
 //#ifndef stateWifi == 0
 WiFiClient client;
-WiFiServer server(80);
+//WiFiServer 
+ESP8266WebServer server(80);
 //   #endif
 
 //const char* ssid = STASSID;
@@ -128,9 +130,75 @@ long numberss[] = {
 bool stateAlarm = false;
 long dataTemp[100];
 
+// HTML content
+const char HTML_PAGE[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alarm Sederhana</title>
+</head>
+<body>
+    <h1>Alarm Sederhana</h1>
+    <form id="alarmForm">
+        <label for="inputNumber">Masukkan Angka:</label>
+        <input type="number" id="inputNumber" name="inputNumber">
+        <br><br>
+        <button type="button" onclick="turnOnAlarm()">Hidupkan Alarm</button>
+        <button type="button" onclick="turnOffAlarm()">Matikan Alarm</button>
+    </form>
+    <p id="status">Status: Alarm Mati</p>
+    <p id="inputValue">Nilai yang dimasukkan: -</p>
+
+    <script>
+        let alarmOn = false;
+
+        function turnOnAlarm() {
+            const inputNumber = document.getElementById('inputNumber').value;
+            if (inputNumber === '') {
+                alert('Silakan masukkan angka terlebih dahulu!');
+                return;
+            }
+            alarmOn = true;
+            document.getElementById('status').textContent = 'Status: Alarm Hidup';
+            document.getElementById('inputValue').textContent = 'Nilai yang dimasukkan: ' + inputNumber;
+            fetch('/set?value=' + inputNumber + '&status=1');
+        }
+
+        function turnOffAlarm() {
+            alarmOn = false;
+            document.getElementById('status').textContent = 'Status: Alarm Mati';
+            document.getElementById('inputValue').textContent = 'Nilai yang dimasukkan: -';
+            fetch('/set?value=0&status=0');
+        }
+    </script>
+</body>
+</html>
+)rawliteral";
+
+void handleCustomConfig() {
+  server.send(200, "text/html", HTML_PAGE);
+}
+
+void handleSetAlarm() {
+  String inputValue = server.arg("value");
+  int status = server.arg("status").toInt();
+  
+  int inputInt = inputValue.toInt();
+  
+  EEPROM.write(7, inputInt);
+  EEPROM.write(8, status);
+  EEPROM.commit();
+  Serial.println(String()+"data :" + inputInt);
+  Serial.println(String()+"status:"+ status);
+
+  server.send(200, "text/plain", "OK");
+}
+
  void setup() 
  {
-   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP  
+   //WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP  
    // put your setup code here, to run once:
    Serial.begin(115200);
    digitalWrite(indikator, LOW);
@@ -140,11 +208,11 @@ long dataTemp[100];
    pinMode(button,INPUT);
    pinMode(led_state, OUTPUT);
    pinMode(dimmer_led, OUTPUT);
-   EEPROM.begin(12);
+   EEPROM.begin(512);
    Wire.begin();
    strip.begin();
    dht.begin();
-   wifi.resetSettings(); 
+   //wifi.resetSettings(); 
    strip.setBrightness(50);
    stateWifi = EEPROM.read(0);
    stateMode = EEPROM.read(0);
@@ -156,59 +224,20 @@ long dataTemp[100];
      if(wm_nonblocking) wifi.setConfigPortalBlocking(false);
         ////////////////
         // add a custom input field
-  int customFieldLength = 40;
+  //int customFieldLength = 40;
 
   // test custom html(radio)
-  const char* custom_radio_str = "<head><title>Alarm Clock</title><style>body{display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial,sans-serif;background-color:#f0f0f0;"}.container {
-            text-align: center;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .time-inputs {
-            margin-bottom: 20px;
-        }
-        .time-inputs input {
-            width: 60px;
-            padding: 5px;
-            font-size: 16px;
-            text-align: center;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
-        }
-        .set-btn {
-            background-color: #4CAF50;
-            color: white;
-        }
-        .stop-btn {
-            background-color: #f44336;
-            color: white;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Alarm Clock</h1>
-        <div class="time-inputs">
-            <input type="number" id="hours" min="0" max="23" placeholder="HH">
-            <input type="number" id="minutes" min="0" max="59" placeholder="MM">
-            <input type="number" id="seconds" min="0" max="59" placeholder="SS">
-        </div>
-        <button class="set-btn">Set Alarm</button>
-        <button class="stop-btn">Stop Alarm</button>
-    </div>
-</body>
-";
-  new (&custom_field) WiFiManagerParameter(custom_radio_str); // custom html input
+//  const char* custom_radio_str = "";
+//  new (&custom_field) WiFiManagerParameter(custom_radio_str); // custom html input
+  WiFiManagerParameter custom_html("custom", HTML_PAGE, "", 5000, "type=\"hidden\"");
+  wifi.addParameter(&custom_html);
   
-  wifi.addParameter(&custom_field);
-  wifi.setSaveParamsCallback(saveParamCallback);
+  // Set up the custom web server
+  server.on("/custom", handleCustomConfig);
+  server.on("/set", handleSetAlarm);
+  
+ // wifi.addParameter(&custom_field);
+  //wifi.setSaveParamsCallback(saveParamCallback);
 
   std::vector<const char *> menu = {"wifi","info","param","sep","restart","exit"};
   wifi.setMenu(menu);
@@ -317,7 +346,7 @@ long dataTemp[100];
        /* setup the OTA server */
        ArduinoOTA.begin();
        Serial.println("Ready");
-       
+       server.begin();
        delay(1000);
        //Serial.println(String()+"NTP in the setup:"+ Clock.getHours()+":"+ Clock.getMinutes()+":"+Clock.getSeconds());
        flag=1;
@@ -345,21 +374,29 @@ long dataTemp[100];
     
     // now it is safe to enable interrupt output
     Time.turnOnAlarm(1);
+
+    int savedInput = EEPROM.read(7);
+  int savedStatus = EEPROM.read(8);
+
+  Serial.print("Saved Input: ");
+  Serial.println(savedInput);
+  Serial.print("Saved Status: ");
+  Serial.println(savedStatus);
 }
 
-String getParam(String name){
-  //read parameter from server, for customhmtl input
-  String value;
-  if(wifi.server->hasArg(name)) {
-    value = wifi.server->arg(name);
-  }
-  return value;
-}
-
-void saveParamCallback(){
-  Serial.println("[CALLBACK] saveParamCallback fired");
-  Serial.println("PARAM customfieldid = " + getParam("customfieldid"));
-}
+//String getParam(String name){
+//  //read parameter from server, for customhmtl input
+//  String value;
+//  if(wifi.server->hasArg(name)) {
+//    value = wifi.server->arg(name);
+//  }
+//  return value;
+//}
+//
+//void saveParamCallback(){
+//  Serial.println("[CALLBACK] saveParamCallback fired");
+//  Serial.println("PARAM customfieldid = " + getParam("customfieldid"));
+//}
 
 void loop() {
   checkButton();
@@ -374,6 +411,7 @@ void loop() {
  if(stateWifi == 1)
   {
    ArduinoOTA.handle();
+   server.handleClient();
    if(wm_nonblocking) wifi.process();
  
    warningWIFI = 0;

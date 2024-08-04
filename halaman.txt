@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alarm Sederhana</title>
+</head>
+<body>
+    <h1>Alarm Sederhana</h1>
+    <form id="alarmForm">
+        <label for="inputNumber">Masukkan Angka:</label>
+        <input type="number" id="inputNumber" name="inputNumber">
+        <br><br>
+        <button type="button" onclick="turnOnAlarm()">Hidupkan Alarm</button>
+        <button type="button" onclick="turnOffAlarm()">Matikan Alarm</button>
+    </form>
+    <p id="status">Status: Alarm Mati</p>
+    <p id="inputValue">Nilai yang dimasukkan: -</p>
+
+    <script>
+        let alarmOn = false;
+
+        function turnOnAlarm() {
+            const inputNumber = document.getElementById('inputNumber').value;
+            if (inputNumber === '') {
+                alert('Silakan masukkan angka terlebih dahulu!');
+                return;
+            }
+            alarmOn = true;
+            document.getElementById('status').textContent = 'Status: Alarm Hidup';
+            document.getElementById('inputValue').textContent = 'Nilai yang dimasukkan: ' + inputNumber;
+            console.log('Alarm dihidupkan dengan angka:', inputNumber);
+        }
+
+        function turnOffAlarm() {
+            alarmOn = false;
+            document.getElementById('status').textContent = 'Status: Alarm Mati';
+            document.getElementById('inputValue').textContent = 'Nilai yang dimasukkan: -';
+            console.log('Alarm dimatikan');
+        }
+    </script>
+</body>
+</html>
