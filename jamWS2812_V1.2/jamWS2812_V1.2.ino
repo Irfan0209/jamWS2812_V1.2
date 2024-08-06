@@ -38,14 +38,9 @@
 #define dimmer_led  D4//16; //D0
 #define DHTTYPE DHT11
 
-//#ifndef stateWifi == 0
 WiFiClient client;
-//WiFiServer 
 ESP8266WebServer server(80);
-//   #endif
 
-//const char* ssid = STASSID;
-//const char* password = STAPSK;
 const char* host = "JAM-KECIL";
 
 RTClib RTC;
@@ -66,17 +61,17 @@ bool wm_nonblocking = false;
 DateTime now;
 WiFiManager wifi;
 WiFiManagerParameter custom_field; // global param ( for non blocking w params )
-//unsigned long saveTimer = 0;
-int dot1[]={42,43};
-int dot2[]={44,45};
-int flag=0;
+
+byte dot1[]={42,43};
+byte dot2[]={44,45};
+byte flag=0;
 unsigned long tmrsave = 0;
 unsigned long tmrsaveHue = 0;
-unsigned long tmrWarning = 0;
+//unsigned long tmrWarning = 0;
 int delayWarning(200);
 int delayHue(2);
 int Delay(500);
-int TIMER = 0;
+//int TIMER = 0;
 int dotsOn = 0;
 bool warningWIFI = false;
 static int hue;
@@ -84,10 +79,16 @@ int pixelColor;
 int peakWIFI = 0;
 bool stateWifi,stateMode;
 int temp1,temp2;
-int         RunSel    = 1; //
-int         RunFinish = 0 ;
+byte         RunSel    = 1; //
+byte         RunFinish = 0 ;
 boolean     DoSwap;
-int statusAlarm;
+byte statusAlarm;
+bool stateAlarm = false;
+long dataTemp[100];
+String jamSet1,jamSet2;
+String menitSet1,menitSet2;
+String statusAlarm1,statusAlarm2;
+
 const long utcOffsetInSeconds = 25200;
 WiFiUDP ntpUDP;
 NTPClient Clock(ntpUDP, "asia.pool.ntp.org", utcOffsetInSeconds);
@@ -127,8 +128,7 @@ long numberss[] = {
   0b1111000   // [28] '
 };
 
-bool stateAlarm = false;
-long dataTemp[100];
+
 
 // HTML content
 const char HTML_PAGE[] PROGMEM = R"rawliteral(
@@ -177,40 +177,50 @@ const char HTML_PAGE[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
-String inputValue;
+
 void handleCustomConfig() {
   server.send(200, "text/html", HTML_PAGE);
   Serial.println("handleCustomConfig jalan");
+  for(int i=0;i<2;i++){buzzer(1);delay(60);buzzer(0);delay(60);}
 }
 
 void handleSetAlarm() {
   Serial.println("set alarm jalan");
-
+  buzzer(1);
   
-   inputValue = server.arg("value");
+  String inputValue = server.arg("value");
+  jamSet1   = inputValue.substring(0,2);
+  menitSet1 = inputValue.substring(2,4);
+  jamSet2   = inputValue.substring(4,6);
+  menitSet2 = inputValue.substring(6,8);
    
-   statusAlarm = server.arg("status").toInt();
-  
+  String inputStatus = server.arg("status");
+  statusAlarm1 = inputStatus.substring(0,1);
+  statusAlarm2 = inputStatus.substring(1,2);
   int inputInt = inputValue.toInt();
   
-  
-
   //Time.setA1Time(5, 04, 45, 00, 0x0, true,false, false);
-  EEPROM.write(7, inputInt);
-  EEPROM.write(8, statusAlarm);
+  EEPROM.write(1, statusAlarm1.toInt());
+  EEPROM.write(2, statusAlarm2.toInt());
+  EEPROM.write(3, jamSet1.toInt());
+  EEPROM.write(4, menitSet1.toInt());
+  EEPROM.write(5, jamSet2.toInt());
+  EEPROM.write(6, menitSet2.toInt());
   EEPROM.commit();
-  Serial.println(String()+"data  :" + inputInt);
-  Serial.println(String()+"status:"+ statusAlarm);
-//  Serial.println(String()+"jam:"+ jam);
-//  Serial.println(String()+"menit:"+ menit);
+  //Serial.println(String()+ "data    :" + inputInt);
+  
+  Serial.println(String()+ "jamSet1:menitSet1=" + jamSet1 + ":" + menitSet1);
+  Serial.println(String()+ "jamSet2:menitSet2=" + jamSet2 + ":" + menitSet2);
+  Serial.println(String()+ "status 1 :" + statusAlarm1);
+  Serial.println(String()+ "status 2 :" + statusAlarm2);
 
   server.send(200, "text/plain", "OK");
+  delay(60);
+  buzzer(0);
 }
 
  void setup() 
  {
-   //WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP  
-   // put your setup code here, to run once:
    Serial.begin(115200);
    digitalWrite(indikator, LOW);
    pinMode(indikator, OUTPUT);
@@ -233,33 +243,23 @@ void handleSetAlarm() {
    if(stateWifi==1)
    { 
      if(wm_nonblocking) wifi.setConfigPortalBlocking(false);
-        ////////////////
-        // add a custom input field
-  //int customFieldLength = 40;
-
-  // test custom html(radio)
-  // const char* custom_radio_str = "";
-  // new (&custom_field) WiFiManagerParameter(custom_radio_str); // custom html input
-  WiFiManagerParameter custom_html("param", HTML_PAGE, "", 5000, "type=\"hidden\"");
+  
+  WiFiManagerParameter custom_html("alarm", HTML_PAGE, "", 5000, "type=\"hidden\"");
   wifi.addParameter(&custom_html);
   
   // Set up the custom web server
-  server.on("/param", handleCustomConfig);
+  server.on("/alarm", handleCustomConfig);
   server.on("/set", handleSetAlarm);
   
-  //wifi.addParameter(&custom_field);
-  //wifi.setSaveParamsCallback(saveParamCallback);
-
   std::vector<const char *> menu = {"wifi","info","param","sep","restart","exit"};
   wifi.setMenu(menu);
 
   // set dark theme
   wifi.setClass("invert");
-        ///////////////////////////
-   //WiFi.mode(WIFI_STA);
+   
    showAP();
    //wifi.setConfigPortalTimeout(60);
-   bool connectWIFI = wifi.autoConnect("JAM DIGITAL TERAS", "00000000");
+   bool connectWIFI = wifi.autoConnect("JAM DIGITAL KECIL", "00000000");
    //keluarkan tulisan RTC
    if(!connectWIFI) 
    {
@@ -329,34 +329,21 @@ void handleSetAlarm() {
          buzzer(1);
          delay(50);
          buzzer(0);
-///           analogWrite(dimmer_led, 0);
-///           analogWrite(led_state, 990);
-       //for(int i=0;i<2;i++){ strip.setPixelColor(dot1[i],strip.Color(255,0,0)); strip.setPixelColor(dot2[i],strip.Color(0,0,0)); strip.show();}
-     strip.clear();
+         strip.clear();
         });
      
        ArduinoOTA.onEnd([]() 
        { // do a fancy thing with our board led at end
         strip.clear();
-//         for (int i = 0; i < 30; i++) 
-//         {
-//          // analogWrite(led_state, (i * 100) % 1001);
-//           for(int a=0;a<2;a++){ strip.setPixelColor(dot2[a],strip.Color(0,0,0)); strip.setPixelColor(dot1[a],strip.Color((i * 100) % 1001,0,0)); strip.show();}
-//           if(i % 2){buzzer(1);}
-//           else{buzzer(0);}
-//           delay(50);
-//           
-//         }
-           showEnd();
+        showEnd();
        });
 
        ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
        //Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
        int ledsToLight = (progress * LED) / total;
        //strip.clear();
-      // for (int i = 0; i < LED; i++) {
          strip.setPixelColor(ledsToLight, strip.Color(0, 0, 255)); // Biru menandakan progres
-         //    }
+         
           strip.show();
         Serial.println(String()+"counter:"+ledsToLight);
         });
@@ -382,69 +369,42 @@ void handleSetAlarm() {
    else
    {  
       showRTC();
-//      WiFi.mode(WIFI_STA);
-//      IPAddress local_ip(192,168,1,1);
-//      IPAddress gateway(192,168,1,1);
-//      IPAddress subnet(255,255,255,0);
-//      WiFi.softAP(ssid,password);
-//      WiFi.softAPConfig(local_ip,gateway,subnet);
-//      delay(1000);
-//
-//      server.begin();
-
       delay(1000);
    } 
-     strip.clear();
-    //for(int i=0;i<2;i++){ strip.setPixelColor(dot1[i],strip.Color(0,0,0)); strip.setPixelColor(dot2[i],strip.Color(0,0,0)); strip.show();}
+    strip.clear();
     Serial.println("RUN");
-    Time.setA1Time(3, 11, 26, 00, 0x0, true,false, false);
-    //Time.setA1Time(5, jamSet.toInt(), menitSet.toInt(), 00, 0x0, true,false, false);
-    // now it is safe to enable interrupt output
-    Time.turnOnAlarm(1);
-    //Time.checkIfAlarm(1);
-    int savedInput = EEPROM.read(7);
-  int savedStatus = EEPROM.read(8);
+    
+     int inputStatusAlarm1 = EEPROM.read(1);
+     int inputStatusAlarm2 = EEPROM.read(2);
+     int inputJamSet1 = EEPROM.read(3);
+     int inputMenitSet1 = EEPROM.read(4);
+     int inputJamSet2 = EEPROM.read(5);
+     int inputMenitSet2 = EEPROM.read(6);
 
-  Serial.print("Saved Input: ");
-  Serial.println(savedInput);
-  Serial.print("Saved Status: ");
-  Serial.println(savedStatus);
+     statusAlarm1 = String(inputStatusAlarm1);
+     statusAlarm2 = String(inputStatusAlarm2);
+     jamSet1      = String(inputJamSet1);
+     menitSet1    = String(inputMenitSet1);
+     jamSet2      = String(inputJamSet2);
+     menitSet2    = String(inputMenitSet2);
+  
+    Serial.println(String()+ "jamSet1:menitSet1=" + inputJamSet1 + ":" + inputMenitSet1);
+    Serial.println(String()+ "jamSet2:menitSet2=" + inputJamSet2 + ":" + inputMenitSet2);
+    Serial.println(String()+ "status 1 :" + inputStatusAlarm1);
+    Serial.println(String()+ "status 2 :" + inputStatusAlarm2);
 }
-
-//String getParam(String name){
-//  //read parameter from server, for customhmtl input
-//  String value;
-//  if(wifi.server->hasArg(name)) {
-//    value = wifi.server->arg(name);
-//  }
-//  return value;
-//}
-//
-//void saveParamCallback(){
-//  Serial.println("[CALLBACK] saveParamCallback fired");
-//  Serial.println("PARAM customfieldid = " + getParam("custom_html"));
-//}
 
 void loop() {
   checkButton();
   stateWIFI();
+  timerHue();
   //autoBright();
   //autoConnectt();
   //timerRestart();
   //printDebug();
-  timerHue();
- 
+  alarmRun(stateAlarm);
   
-  String jamSet = inputValue.substring(0, 2);
-  String menitSet = inputValue.substring(2, 4);
-//  if(statusAlarm == 1){ Time.turnOnAlarm(1); }
-//  if(statusAlarm == 0){ Time.turnOffAlarm(1); }
-   alarmRun(stateAlarm);
-  
-//  Serial.println(String()+"jam        :"+ jamSet);
-//  Serial.println(String()+"menit      :"+ menitSet);
-//  Serial.println(String()+"statusAlarm:"+ statusAlarm);
-  Serial.println(String()+"stateAlarm :"+ stateAlarm);
+  //Serial.println(String()+"stateAlarm :"+ stateAlarm);
   
  if(stateWifi == 1)
   {
@@ -484,9 +444,13 @@ void loop() {
     monitorTemp(2);
 
    }
-    if(checkAlarm(jamSet.toInt(),menitSet.toInt())){
+    if(checkAlarm(jamSet1.toInt(),menitSet1.toInt(),statusAlarm1.toInt())){
     stateAlarm=true;
-    Serial.println(String()+"alarm jalan");
+    Serial.println(String()+"alarm jalan 1");
+   }
+    else if(checkAlarm(jamSet2.toInt(),menitSet2.toInt(),statusAlarm2.toInt())){
+    stateAlarm=true;
+    Serial.println(String()+"alarm jalan 2");
    }
     //Serial.println(String()+"RunSel:"+RunSel);
     if(RunFinish==1) {RunSel = 2; RunFinish =0;}                      //after anim 1 set anim 2
@@ -496,15 +460,16 @@ void loop() {
   
 }
 
-bool checkAlarm(int jam,int menit){
+bool checkAlarm(int jam,int menit,int state){
   now = RTC.now();
-  if(now.hour() == jam && now.minute() == menit && now.second() == 00 ){
+  if(now.hour() == jam && now.minute() == menit && now.second() == 00 && state == 1){
     return true;
   }
   else{
     return false;
   }
 }
+
 void alarmRun(int state){
   if(!state) return;
   static byte counter;
@@ -528,7 +493,6 @@ void alarmRun(int state){
     save = 0;
     buzzer(0);
     stateAlarm = false;
-    //Time.turnOffAlarm(1);
   }
 }
 
@@ -686,14 +650,6 @@ void getTemp(){
    
 }
 
-/*
- * void getTemp(){
-   float data = dht.readTemperature();
-   temp1 = int(data) / 10;
-   temp2 = int(data) % 10;
-   
-}
- */
 void showClock(uint32_t color) {
   DisplayNumber(h1, 3, color);
   DisplayNumber(h2, 2, color);
@@ -723,7 +679,7 @@ void showError() {
   DisplayNumber( 18, 0, strip.Color(255, 0, 0));
 }
 
-void showEnd() {//161720
+void showEnd() {
   DisplayNumber( 23 , 3, strip.Color(255, 0, 0));
   DisplayNumber( 13, 2, strip.Color(0, 255, 0));
   DisplayNumber( 17, 1, strip.Color(0, 255, 0));
@@ -774,13 +730,15 @@ void showRTC() {
 
 
 void stateWIFI() {
+  if(!stateWifi) return;
+  static int TIMER;
+  static unsigned long tmrWarning;
+  //unsigned long tmr = millis();
 
-  unsigned long tmr = millis();
-  if(stateWifi){
   if (WiFi.status() != WL_CONNECTED) {
-    if (tmr - tmrWarning > delayWarning) {
-      tmrWarning = tmr;
-      //warningWIFI = !warningWIFI;
+    
+    if (millis() - tmrWarning > delayWarning) {
+      tmrWarning = millis();
       TIMER++;
       if(TIMER <= 10)
       {
@@ -793,15 +751,14 @@ void stateWIFI() {
         EEPROM.commit();
         buzzer(1);
         showDisconnect();
-        //digitalWrite(BUZZ,HIGH);
         delay(1500);
         ESP.restart();
       }
       Serial.println(String() + "Timer:" + TIMER);
     }
-     }
-    }
   }
+    
+}
   
 
 void showDots(uint32_t color) {
@@ -857,25 +814,6 @@ uint32_t Wheel(byte WheelPos) {
   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
 }
 
-/*
-void timerRestart() {
-  now = RTC.now();
-  int jam   = now.hour();
-  int menit = now.minute();
-  int detik = now.second();
-
-  if (jam == 6 && menit == 0 && detik == 0) {
-    ESP.restart();
-  }
-  if (jam == 18 && menit == 0 && detik == 0) {
-    ESP.restart();
-  }
-  if (jam == 21 && menit == 0 && detik == 0) {
-    ESP.restart();
-  }
-}
-*/
-
 void checkButton()
 {
   if(digitalRead(button) == LOW)
@@ -891,18 +829,15 @@ void checkButton()
     Serial.println(String() + "mode berubah");
     for (int i = 0; i < 150; i++) 
     {
-//      analogWrite(led_state, (i * 100) % 1001);
-//      analogWrite(dimmer_led, (i * 100) % 1001);
       for(int a=0;a<4;a++){ strip.setPixelColor(dot2[a],strip.Color((i * 100) % 1001,0,0)); strip.setPixelColor(dot1[a],strip.Color((i * 100) % 1001,0,0)); strip.show();}
       if(i % 2){buzzer(1);}
       else{buzzer(0);}
       delay(50);
     }
-    //buzzer(1);
     delay(1000);
     
-     strip.clear();
-     wifi.resetSettings(); 
+    strip.clear();
+    wifi.resetSettings(); 
     ESP.restart();
   }
  
@@ -965,21 +900,6 @@ void buzzer(int state)
  if(state){digitalWrite(BUZZ,HIGH);}
  else{digitalWrite(BUZZ,LOW); }
 }
-
-/*
-void autoBright()
-{
-  now = RTC.now();
-  int jam   = now.hour();
-  if(jam <= 6 && jam <= 18){
-    strip.setBrightness(100);
-  }
-
-  if(jam >= 18 && jam <= 6){
-    strip.setBrightness(80);
-  }
-}
-*/
 
 boolean dwDo(int DrawAdd)
   { if (RunSel== DrawAdd) {return true;}
