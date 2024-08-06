@@ -31,7 +31,7 @@
 #define LEDS_PER_DIGIT  LEDS_PER_SEG * 7
 #define LED   88
 #define indikator D0 //D4=lampu internal,D0=lampu eksternal
-#define BUZZ D4//D7
+#define BUZZ D4//D7//
 #define button D3//
 #define led_state D2//4;//D2
 #define N_DIMMERS 1
@@ -46,7 +46,7 @@ ESP8266WebServer server(80);
 
 //const char* ssid = STASSID;
 //const char* password = STAPSK;
-const char* host = "OTA-LEDS";
+const char* host = "JAM-KECIL";
 
 RTClib RTC;
 DS3231 Time;
@@ -87,7 +87,7 @@ int temp1,temp2;
 int         RunSel    = 1; //
 int         RunFinish = 0 ;
 boolean     DoSwap;
-
+int statusAlarm;
 const long utcOffsetInSeconds = 25200;
 WiFiUDP ntpUDP;
 NTPClient Clock(ntpUDP, "asia.pool.ntp.org", utcOffsetInSeconds);
@@ -113,7 +113,7 @@ long numberss[] = {
   0b0111101,  // [14] n(N)
   0b1001110,  // [15] t
   0b1111110,  // [16] e
-  0b1000101,  // [17] n
+  0b1000101,  // [17] n 
   0b1000100,  // [18] r
   0b1000111,  // [19] o
   0b1100111,  // [20] d
@@ -177,21 +177,32 @@ const char HTML_PAGE[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
+String inputValue;
 void handleCustomConfig() {
   server.send(200, "text/html", HTML_PAGE);
+  Serial.println("handleCustomConfig jalan");
 }
 
 void handleSetAlarm() {
-  String inputValue = server.arg("value");
-  int status = server.arg("status").toInt();
+  Serial.println("set alarm jalan");
+
+  
+   inputValue = server.arg("value");
+   
+   statusAlarm = server.arg("status").toInt();
   
   int inputInt = inputValue.toInt();
   
+  
+
+  //Time.setA1Time(5, 04, 45, 00, 0x0, true,false, false);
   EEPROM.write(7, inputInt);
-  EEPROM.write(8, status);
+  EEPROM.write(8, statusAlarm);
   EEPROM.commit();
-  Serial.println(String()+"data :" + inputInt);
-  Serial.println(String()+"status:"+ status);
+  Serial.println(String()+"data  :" + inputInt);
+  Serial.println(String()+"status:"+ statusAlarm);
+//  Serial.println(String()+"jam:"+ jam);
+//  Serial.println(String()+"menit:"+ menit);
 
   server.send(200, "text/plain", "OK");
 }
@@ -227,16 +238,16 @@ void handleSetAlarm() {
   //int customFieldLength = 40;
 
   // test custom html(radio)
-//  const char* custom_radio_str = "";
-//  new (&custom_field) WiFiManagerParameter(custom_radio_str); // custom html input
-  WiFiManagerParameter custom_html("custom", HTML_PAGE, "", 5000, "type=\"hidden\"");
+  // const char* custom_radio_str = "";
+  // new (&custom_field) WiFiManagerParameter(custom_radio_str); // custom html input
+  WiFiManagerParameter custom_html("param", HTML_PAGE, "", 5000, "type=\"hidden\"");
   wifi.addParameter(&custom_html);
   
   // Set up the custom web server
-  server.on("/custom", handleCustomConfig);
+  server.on("/param", handleCustomConfig);
   server.on("/set", handleSetAlarm);
   
- // wifi.addParameter(&custom_field);
+  //wifi.addParameter(&custom_field);
   //wifi.setSaveParamsCallback(saveParamCallback);
 
   std::vector<const char *> menu = {"wifi","info","param","sep","restart","exit"};
@@ -247,7 +258,7 @@ void handleSetAlarm() {
         ///////////////////////////
    //WiFi.mode(WIFI_STA);
    showAP();
-   wifi.setConfigPortalTimeout(60);
+   //wifi.setConfigPortalTimeout(60);
    bool connectWIFI = wifi.autoConnect("JAM DIGITAL TERAS", "00000000");
    //keluarkan tulisan RTC
    if(!connectWIFI) 
@@ -312,7 +323,7 @@ void handleSetAlarm() {
        for(int i=0;i<2;i++){ strip.setPixelColor(dot1[i],strip.Color(0,0,0)); strip.setPixelColor(dot2[i],strip.Color(50,0,0)); strip.show();}
        
      
-       //ArduinoOTA.setHostname(host);
+       ArduinoOTA.setHostname(host);
        ArduinoOTA.onStart([]() 
         {
          buzzer(1);
@@ -320,25 +331,41 @@ void handleSetAlarm() {
          buzzer(0);
 ///           analogWrite(dimmer_led, 0);
 ///           analogWrite(led_state, 990);
-       for(int i=0;i<2;i++){ strip.setPixelColor(dot1[i],strip.Color(255,0,0)); strip.setPixelColor(dot2[i],strip.Color(0,0,0)); strip.show();}
-     
+       //for(int i=0;i<2;i++){ strip.setPixelColor(dot1[i],strip.Color(255,0,0)); strip.setPixelColor(dot2[i],strip.Color(0,0,0)); strip.show();}
+     strip.clear();
         });
      
        ArduinoOTA.onEnd([]() 
        { // do a fancy thing with our board led at end
-         for (int i = 0; i < 30; i++) 
-         {
-          // analogWrite(led_state, (i * 100) % 1001);
-           for(int a=0;a<2;a++){ strip.setPixelColor(dot2[a],strip.Color(0,0,0)); strip.setPixelColor(dot1[a],strip.Color((i * 100) % 1001,0,0)); strip.show();}
-           if(i % 2){buzzer(1);}
-           else{buzzer(0);}
-           delay(50);
-           
-         }
+        strip.clear();
+//         for (int i = 0; i < 30; i++) 
+//         {
+//          // analogWrite(led_state, (i * 100) % 1001);
+//           for(int a=0;a<2;a++){ strip.setPixelColor(dot2[a],strip.Color(0,0,0)); strip.setPixelColor(dot1[a],strip.Color((i * 100) % 1001,0,0)); strip.show();}
+//           if(i % 2){buzzer(1);}
+//           else{buzzer(0);}
+//           delay(50);
+//           
+//         }
+           showEnd();
        });
+
+       ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+       //Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+       int ledsToLight = (progress * LED) / total;
+       //strip.clear();
+      // for (int i = 0; i < LED; i++) {
+         strip.setPixelColor(ledsToLight, strip.Color(0, 0, 255)); // Biru menandakan progres
+         //    }
+          strip.show();
+        Serial.println(String()+"counter:"+ledsToLight);
+        });
      
        ArduinoOTA.onError([](ota_error_t error) 
        {
+         strip.clear();
+         Serial.println(String()+"error");
+         showError();
          (void)error;
          ESP.restart();
        });
@@ -367,14 +394,14 @@ void handleSetAlarm() {
 
       delay(1000);
    } 
-
-    for(int i=0;i<2;i++){ strip.setPixelColor(dot1[i],strip.Color(0,0,0)); strip.setPixelColor(dot2[i],strip.Color(0,0,0)); strip.show();}
+     strip.clear();
+    //for(int i=0;i<2;i++){ strip.setPixelColor(dot1[i],strip.Color(0,0,0)); strip.setPixelColor(dot2[i],strip.Color(0,0,0)); strip.show();}
     Serial.println("RUN");
-    Time.setA1Time(5, 04, 45, 00, 0x0, true,false, false);
-    
+    Time.setA1Time(3, 11, 26, 00, 0x0, true,false, false);
+    //Time.setA1Time(5, jamSet.toInt(), menitSet.toInt(), 00, 0x0, true,false, false);
     // now it is safe to enable interrupt output
     Time.turnOnAlarm(1);
-
+    //Time.checkIfAlarm(1);
     int savedInput = EEPROM.read(7);
   int savedStatus = EEPROM.read(8);
 
@@ -395,7 +422,7 @@ void handleSetAlarm() {
 //
 //void saveParamCallback(){
 //  Serial.println("[CALLBACK] saveParamCallback fired");
-//  Serial.println("PARAM customfieldid = " + getParam("customfieldid"));
+//  Serial.println("PARAM customfieldid = " + getParam("custom_html"));
 //}
 
 void loop() {
@@ -406,7 +433,18 @@ void loop() {
   //timerRestart();
   //printDebug();
   timerHue();
-  alarmRun(stateAlarm);
+ 
+  
+  String jamSet = inputValue.substring(0, 2);
+  String menitSet = inputValue.substring(2, 4);
+//  if(statusAlarm == 1){ Time.turnOnAlarm(1); }
+//  if(statusAlarm == 0){ Time.turnOffAlarm(1); }
+   alarmRun(stateAlarm);
+  
+//  Serial.println(String()+"jam        :"+ jamSet);
+//  Serial.println(String()+"menit      :"+ menitSet);
+//  Serial.println(String()+"statusAlarm:"+ statusAlarm);
+  Serial.println(String()+"stateAlarm :"+ stateAlarm);
   
  if(stateWifi == 1)
   {
@@ -446,8 +484,9 @@ void loop() {
     monitorTemp(2);
 
    }
-    if(Time.checkIfAlarm(1)){
+    if(checkAlarm(jamSet.toInt(),menitSet.toInt())){
     stateAlarm=true;
+    Serial.println(String()+"alarm jalan");
    }
     //Serial.println(String()+"RunSel:"+RunSel);
     if(RunFinish==1) {RunSel = 2; RunFinish =0;}                      //after anim 1 set anim 2
@@ -457,6 +496,15 @@ void loop() {
   
 }
 
+bool checkAlarm(int jam,int menit){
+  now = RTC.now();
+  if(now.hour() == jam && now.minute() == menit && now.second() == 00 ){
+    return true;
+  }
+  else{
+    return false;
+  }
+}
 void alarmRun(int state){
   if(!state) return;
   static byte counter;
@@ -473,14 +521,14 @@ void alarmRun(int state){
     else{
       buzzer(0);
     }
-    //Serial.println(String()+"counterNTP:"+ counter);
+    Serial.println(String()+"counterAlarm:"+ counter);
   }
   if((tmr - save) > 2000 and (counter > limit)){
     counter = 0;
     save = 0;
     buzzer(0);
     stateAlarm = false;
-    Time.turnOffAlarm(1);
+    //Time.turnOffAlarm(1);
   }
 }
 
@@ -668,19 +716,19 @@ void showDisconnect() {
   DisplayNumber( 22, 0, strip.Color(255, 0, 0));
 }
 
-//void showError() {
-//  DisplayNumber( 13, 3, strip.Color(255, 0, 0));
-//  DisplayNumber( 18, 2, strip.Color(255, 0, 0));
-//  DisplayNumber( 19, 1, strip.Color(255, 0, 0));
-//  DisplayNumber( 18, 0, strip.Color(255, 0, 0));
-//}
+void showError() {
+  DisplayNumber( 13, 3, strip.Color(255, 0, 0));
+  DisplayNumber( 18, 2, strip.Color(255, 0, 0));
+  DisplayNumber( 19, 1, strip.Color(255, 0, 0));
+  DisplayNumber( 18, 0, strip.Color(255, 0, 0));
+}
 
-//void showErrorAP() {
-//  DisplayNumber( 13 , 3, strip.Color(255, 0, 0));
-//  DisplayNumber( 23, 2, strip.Color(255, 0, 0));
-//  DisplayNumber( 24, 1, strip.Color(255, 0, 0));
-//  DisplayNumber( 25, 0, strip.Color(255, 0, 0));
-//}
+void showEnd() {//161720
+  DisplayNumber( 23 , 3, strip.Color(255, 0, 0));
+  DisplayNumber( 13, 2, strip.Color(0, 255, 0));
+  DisplayNumber( 17, 1, strip.Color(0, 255, 0));
+  DisplayNumber( 20, 0, strip.Color(0, 255, 0));
+}
 
 void showRTC() {
   DisplayNumber( 23, 3, strip.Color(255, 0, 0));
