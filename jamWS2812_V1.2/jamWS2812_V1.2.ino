@@ -128,49 +128,94 @@ long numberss[] = {
   0b1111000   // [28] '
 };
 
-
+bool alarm1Status = false;
+bool alarm2Status = false;
+String alarm1Time = "";
+String alarm2Time = "";
 
 // HTML content
 const char HTML_PAGE[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alarm Sederhana</title>
-</head>
-<body>
-    <h1>Alarm Sederhana</h1>
-    <form id="alarmForm">
-        <label for="inputNumber">Masukkan Angka:</label>
-        <input type="number" id="inputNumber" name="inputNumber">
-        <br><br>
-        <button type="button" onclick="turnOnAlarm()">Hidupkan Alarm</button>
-        <button type="button" onclick="turnOffAlarm()">Matikan Alarm</button>
-    </form>
-    <p id="status">Status: Alarm Mati</p>
-    <p id="inputValue">Nilai yang dimasukkan: -</p>
-
-    <script>
-        let alarmOn = false;
-
-        function turnOnAlarm() {
-            const inputNumber = document.getElementById('inputNumber').value;
-            if (inputNumber === '') {
-                alert('Silakan masukkan angka terlebih dahulu!');
-                return;
-            }
-            alarmOn = true;
-            document.getElementById('status').textContent = 'Status: Alarm Hidup';
-            document.getElementById('inputValue').textContent = 'Nilai yang dimasukkan: ' + inputNumber;
-            fetch('/set?value=' + inputNumber + '&status=1');
+    <title>Alarm Settings</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
         }
 
-        function turnOffAlarm() {
-            alarmOn = false;
-            document.getElementById('status').textContent = 'Status: Alarm Mati';
-            document.getElementById('inputValue').textContent = 'Nilai yang dimasukkan: -';
-            fetch('/set?value=0&status=0');
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .alarm {
+            margin-bottom: 20px;
+        }
+
+        h1, h2 {
+            text-align: center;
+        }
+
+        button {
+            display: block;
+            margin: 10px auto;
+        }
+
+        p {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Alarm Settings</h1>
+        <div class="alarm">
+            <h2>Alarm 1</h2>
+            <input type="time" id="alarm1Time" onchange="setAlarmTime('alarm1')">
+            <button onclick="toggleAlarm('alarm1')">Turn On/Off</button>
+            <p id="alarm1Status">Status: Off</p>
+        </div>
+        <div class="alarm">
+            <h2>Alarm 2</h2>
+            <input type="time" id="alarm2Time" onchange="setAlarmTime('alarm2')">
+            <button onclick="toggleAlarm('alarm2')">Turn On/Off</button>
+            <p id="alarm2Status">Status: Off</p>
+        </div>
+    </div>
+    <script>
+        function toggleAlarm(alarm) {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    var response = JSON.parse(this.responseText);
+                    document.getElementById('alarm1Status').innerText = 'Status: ' + (response.alarm1 ? 'On' : 'Off');
+                    document.getElementById('alarm2Status').innerText = 'Status: ' + (response.alarm2 ? 'On' : 'Off');
+                }
+            };
+            if (alarm === 'alarm1') {
+                xhttp.open("GET", "/toggleAlarm1", true);
+            } else if (alarm === 'alarm2') {
+                xhttp.open("GET", "/toggleAlarm2", true);
+            }
+            xhttp.send();
+        }
+
+        function setAlarmTime(alarm) {
+            var xhttp = new XMLHttpRequest();
+            var time = document.getElementById(alarm + 'Time').value;
+            xhttp.open("POST", "/set" + alarm.charAt(0).toUpperCase() + alarm.slice(1) + "Time", true);
+            xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+            xhttp.send("time=" + time);
         }
     </script>
 </body>
@@ -197,9 +242,7 @@ void handleSetAlarm() {
   String inputStatus = server.arg("status");
   statusAlarm1 = inputStatus.substring(0,1);
   statusAlarm2 = inputStatus.substring(1,2);
-  int inputInt = inputValue.toInt();
   
-  //Time.setA1Time(5, 04, 45, 00, 0x0, true,false, false);
   EEPROM.write(1, statusAlarm1.toInt());
   EEPROM.write(2, statusAlarm2.toInt());
   EEPROM.write(3, jamSet1.toInt());
@@ -207,7 +250,6 @@ void handleSetAlarm() {
   EEPROM.write(5, jamSet2.toInt());
   EEPROM.write(6, menitSet2.toInt());
   EEPROM.commit();
-  //Serial.println(String()+ "data    :" + inputInt);
   
   Serial.println(String()+ "jamSet1:menitSet1=" + jamSet1 + ":" + menitSet1);
   Serial.println(String()+ "jamSet2:menitSet2=" + jamSet2 + ":" + menitSet2);
@@ -218,6 +260,41 @@ void handleSetAlarm() {
   delay(60);
   buzzer(0);
 }
+////////////////
+void toggleAlarm1() {
+    alarm1Status = !alarm1Status;
+    Serial.println(String() + "alarm1Status: " + String(alarm1Status));
+    sendStatus();
+}
+
+void toggleAlarm2() {
+    alarm2Status = !alarm2Status;
+    Serial.println(String() + "alarm2Status: " + String(alarm2Status));
+    sendStatus();
+}
+
+void setAlarm1Time() {
+    if (server.hasArg("time")) {
+        alarm1Time = server.arg("time");
+        Serial.println("Alarm 1 time set to: " + alarm1Time);
+    }
+    sendStatus();
+}
+
+void setAlarm2Time() {
+    if (server.hasArg("time")) {
+        alarm2Time = server.arg("time");
+        Serial.println("Alarm 2 time set to: " + alarm2Time);
+    }
+    sendStatus();
+}
+
+void sendStatus() {
+    String json = "{ \"alarm1\": " + String(alarm1Status) + ", \"alarm2\": " + String(alarm2Status) + " }";
+    server.send(200, "application/json", json);
+}
+
+////////////////////
 
  void setup() 
  {
@@ -249,7 +326,12 @@ void handleSetAlarm() {
   
   // Set up the custom web server
   server.on("/alarm", handleCustomConfig);
-  server.on("/set", handleSetAlarm);
+  //server.on("/set", handleSetAlarm);
+  server.on("/toggleAlarm1", toggleAlarm1);
+  server.on("/toggleAlarm2", toggleAlarm2);
+  server.on("/setAlarm1Time", setAlarm1Time);
+  server.on("/setAlarm2Time", setAlarm2Time);
+
   
   std::vector<const char *> menu = {"wifi","info","param","sep","restart","exit"};
   wifi.setMenu(menu);
@@ -396,7 +478,7 @@ void handleSetAlarm() {
 
 void loop() {
   checkButton();
-  stateWIFI();
+  //stateWIFI();
   timerHue();
   //autoBright();
   //autoConnectt();
@@ -837,7 +919,7 @@ void checkButton()
     delay(1000);
     
     strip.clear();
-    wifi.resetSettings(); 
+   // wifi.resetSettings(); 
     ESP.restart();
   }
  
